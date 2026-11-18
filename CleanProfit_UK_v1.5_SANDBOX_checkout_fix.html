@@ -227,12 +227,23 @@ async function loadAccount(force=false){
  try{
   const r=await remote();if(epoch!==accountEpoch)return;
   if(r){if(!valid(r.data?.snapshot))throw Error('Cloud snapshot is invalid.');
-   if(localStorage.getItem(pendingKey(uid))==='1')throw Error('Unsaved local changes from an earlier session exist. Export a JSON backup before resolving; cloud data was not applied.');
    const localRaw=localStorage.getItem(key);let archived=false;
-   if(localRaw){const localCopy=JSON.parse(localRaw);if(valid(localCopy)&&!equal(localCopy,r.data.snapshot)){
-     // Never upload the older local copy. Keep a separate, recoverable copy before loading the cloud version.
-     localStorage.setItem(archivedKey(uid),localRaw);archived=true;
-   }}
+   const pending=localStorage.getItem(pendingKey(uid))==='1';
+   if(pending&&!localRaw)throw Error('Pending changes marker exists but local recovery data is missing. Contact support before continuing.');
+   if(localRaw){
+     const localCopy=JSON.parse(localRaw);
+     if(!valid(localCopy))throw Error('Local recovery copy is invalid. Cloud data was not applied; contact support.');
+     if(!equal(localCopy,r.data.snapshot)){
+       // Cloud remains authoritative. Preserve divergent local data before displaying cloud records.
+       const existingArchive=localStorage.getItem(archivedKey(uid));
+       if(existingArchive&&existingArchive!==localRaw)throw Error('A different local recovery archive already exists. Download both backups before resolving.');
+       localStorage.setItem(archivedKey(uid),localRaw);
+       if(localStorage.getItem(archivedKey(uid))!==localRaw)throw Error('Local recovery archive could not be verified.');
+       archived=true;
+     }
+   }
+   // Only clear a pending marker after divergent local data has been safely archived.
+   localStorage.removeItem(pendingKey(uid));
    row=r.id;revision=r.updated_at;hasCloud=true;loadState(r.data.snapshot);localStorage.setItem(key,JSON.stringify(state));unlock();
    say(archived?'✓ Cloud records loaded. An older device copy was preserved separately in case you need it.':'✓ Cloud records loaded. All changes saved.');
    viewDashboard();
