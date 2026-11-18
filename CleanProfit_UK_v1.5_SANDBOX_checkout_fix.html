@@ -336,12 +336,13 @@ document.getElementById('cloudlocalbackup').onclick=()=>{
   a.href=url;a.download='cleanprofit-uk-local-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
  }catch(e){alert('Local backup failed: '+e.message)}
 };
-let initialSignout=true;document.getElementById('cloudsignin').disabled=true;
-client.auth.onAuthStateChange(()=>{if(initialSignout)return;setTimeout(()=>{if(!loading)loadAccount().catch(e=>lock('Connection error: '+e.message))},0)});
+let authInitialising=true;
+document.getElementById('cloudsignin').disabled=true;
+client.auth.onAuthStateChange(()=>{if(authInitialising)return;setTimeout(()=>{if(!loading)loadAccount().catch(e=>lock('Connection error: '+e.message))},0)});
 window.addEventListener('online',()=>{if(uid&&window.cpCloudReady&&dirty)queue();else if(uid&&!dirty&&!window.cpCloudReady)loadAccount(true).catch(()=>{})});
 window.addEventListener('focus',()=>{if(uid&&window.cpCloudReady&&dirty)queue()});
-// Require an explicit sign-in each time the page is opened; never expose the dashboard from a retained session.
-viewCloud();lock();status.textContent='Please sign in to continue.';say('Sign in to load your records securely.');
-(async()=>{try{const {error}=await client.auth.signOut({scope:'local'});if(error)throw error;}catch(e){status.textContent='Could not clear previous session: '+e.message+' Please reload before signing in.';document.getElementById('cloudsignin').disabled=true;}finally{initialSignout=false;if(!status.textContent.startsWith('Could not clear'))document.getElementById('cloudsignin').disabled=false;}})();
+// Restore the persisted session on refresh. Only the Sign out button may end it.
+viewCloud();lock('Restoring secure session…');
+(async()=>{try{await loadAccount(true);}catch(e){lock('Could not restore session: '+e.message);}finally{authInitialising=false;document.getElementById('cloudsignin').disabled=false;}})();
 })();
 </script></body></html>
