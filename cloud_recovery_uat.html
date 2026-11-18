@@ -12,7 +12,7 @@ if(!state||!state.settings||!Array.isArray(state.customers)||!Array.isArray(stat
 state.bookings=Array.isArray(state.bookings)?state.bookings:[];state.quotes=Array.isArray(state.quotes)?state.quotes:[];state.invoices=Array.isArray(state.invoices)?state.invoices:[];state.nextInvoice=Number.isInteger(state.nextInvoice)&&state.nextInvoice>0?state.nextInvoice:1;state.settings={...defaults.settings,...state.settings};
 state.customers=state.customers.map((c,i)=>({...c,id:c.id||('legacy-'+i),phone:c.phone||'',address:c.address||'',archived:!!c.archived}));state.jobs=state.jobs.map((j,i)=>({...j,id:j.id||('job-legacy-'+i),archived:!!j.archived}));
 const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(n),num=id=>Math.max(0,Number($(id).value)||0),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function persist(){if(!activeStorageKey||!window.cpCloudReady){alert('Cloud records are not ready. Please wait for a successful connection.');return;}try{localStorage.setItem(activeStorageKey,JSON.stringify(state));storageOK=true;window.cpOnLocalChange?.()}catch(e){storageOK=false}showStorageWarning()}
+function persist(){if(!activeStorageKey||!window.cpCloudReady){alert('Cloud records are not ready. Please wait for a successful connection.');return;}try{localStorage.setItem(activeStorageKey,JSON.stringify(state));storageOK=true;window.cpOnLocalChange?.()}catch(e){storageOK=false;window.cpCloudStorageFailure?.(e)}showStorageWarning()}
 function showStorageWarning(){let el=$('storage-warning');if(el)el.hidden=storageOK}
 function calc(){let s=state.settings,h=num('qhours'),staff=Math.max(1,Math.floor(num('qstaff'))),rate=num('qrate'),labour=h*staff*s.hourly,extra=num('qmaterials')+num('qtravel')+num('qother'),overhead=(labour+extra)*s.overheadrate/100,cost=labour+extra+overhead,subtotal=h*staff*rate+extra+overhead,profit=subtotal-cost,vat=s.vatmode==='yes'?subtotal*.2:0;return{labour,extra,overhead,cost,subtotal,profit,vat,price:subtotal+vat,h,staff,rate}}
 function renderQuote(){let q=calc();for(let [id,val] of Object.entries({labour:q.labour,extras:q.extra,overhead:q.overhead,totalcost:q.cost,qprofit:q.profit,vat:q.vat,price:q.price}))$(id).textContent=money(val);let m=q.subtotal>0?100*q.profit/q.subtotal:0;$('margininfo').textContent=`Hourly charge: ${money(q.rate)} × ${q.h} hours × ${q.staff} cleaner(s) · Estimated margin: ${m.toFixed(1)}%${m<state.settings.margin?' · Below target margin':''}`}
@@ -164,6 +164,23 @@ const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const dataKey=id=>'cleanprofit-uk-user-'+id;
 const pendingKey=id=>'cleanprofit-uk-pending-'+id;
 const archivedKey=id=>'cleanprofit-uk-precloud-archive-'+id;
+const extraArchiveKey=(id,n)=>archivedKey(id)+'-recovery-'+n;
+const tabKey=id=>'cleanprofit-uk-last-tab-'+id;
+function preserveLocalCopy(id,raw){
+ const keys=[archivedKey(id),...Array.from({length:30},(_,i)=>extraArchiveKey(id,i+1))];
+ for(const k of keys){if(localStorage.getItem(k)===raw)return false;}
+ const free=keys.find(k=>localStorage.getItem(k)===null);
+ if(!free)throw Error('Local recovery archive capacity reached. Download existing recovery copies before continuing.');
+ localStorage.setItem(free,raw);
+ if(localStorage.getItem(free)!==raw)throw Error('Could not verify the saved recovery copy.');
+ return true;
+}
+function showSavedTab(){
+ const tab=localStorage.getItem(tabKey(uid))||'dashboard';
+ const button=document.querySelector('#tabs [data-tab="'+tab+'"]');
+ if(button&&tab!=='cloud'&&tab!=='account'&&tab!=='settings')button.click();
+ else viewDashboard();
+}
 function lock(message){window.cpCloudReady=false;document.body.classList.remove('account-ready');if(message){say(message);detail.textContent=message+' Your data has not been deleted. You can download a local backup below.';}}
 function unlock(){window.cpCloudReady=true;document.body.classList.add('account-ready');}
 const subscriptionStatus=document.getElementById('cp-subscription-status');
@@ -214,7 +231,8 @@ async function write(){
  finally{busy=false;if(dirty&&window.cpCloudReady&&myEpoch===accountEpoch)queue();}
 }
 function queue(){clearTimeout(timer);if(!uid||!window.cpCloudReady)return;say('Changes pending — saving…');timer=setTimeout(write,900);}
-window.cpOnLocalChange=()=>{if(!uid||!window.cpCloudReady)return;dirty=true;try{localStorage.setItem(pendingKey(uid),'1')}catch(e){}queue()};
+window.cpCloudStorageFailure=e=>lock('Browser could not preserve this edit locally: '+(e.message||e)+'. Stop editing and contact support.');
+window.cpOnLocalChange=()=>{if(!uid||!window.cpCloudReady)return;dirty=true;try{localStorage.setItem(pendingKey(uid),'1');queue()}catch(e){lock('Unable to mark unsaved changes safely. Stop editing and contact support.')}};
 async function loadAccount(force=false){
  const {data,error}=await client.auth.getUser();if(error)throw error;
  const u=data.user,next=u?.id||null;
@@ -234,24 +252,20 @@ async function loadAccount(force=false){
      const localCopy=JSON.parse(localRaw);
      if(!valid(localCopy))throw Error('Local recovery copy is invalid. Cloud data was not applied; contact support.');
      if(!equal(localCopy,r.data.snapshot)){
-       // Cloud remains authoritative. Preserve divergent local data before displaying cloud records.
-       const existingArchive=localStorage.getItem(archivedKey(uid));
-       if(existingArchive&&existingArchive!==localRaw)throw Error('A different local recovery archive already exists. Download both backups before resolving.');
-       localStorage.setItem(archivedKey(uid),localRaw);
-       if(localStorage.getItem(archivedKey(uid))!==localRaw)throw Error('Local recovery archive could not be verified.');
-       archived=true;
+       // Cloud remains authoritative. Preserve every distinct recovery copy without replacing earlier ones.
+       archived=preserveLocalCopy(uid,localRaw);
      }
    }
    // Only clear a pending marker after divergent local data has been safely archived.
    localStorage.removeItem(pendingKey(uid));
    row=r.id;revision=r.updated_at;hasCloud=true;loadState(r.data.snapshot);localStorage.setItem(key,JSON.stringify(state));unlock();
    say(archived?'✓ Cloud records loaded. An older device copy was preserved separately in case you need it.':'✓ Cloud records loaded. All changes saved.');
-   viewDashboard();
+   showSavedTab();
   }else{
    const existing=localStorage.getItem(key);
    if(existing){const local=JSON.parse(existing);if(!valid(local))throw Error('Local records invalid.');loadState(local);}
    else loadState(fresh());
-   unlock();viewDashboard();dirty=true;localStorage.setItem(pendingKey(uid),'1');say('Creating cloud record for this account…');queue();
+   unlock();showSavedTab();dirty=true;localStorage.setItem(pendingKey(uid),'1');say('Creating cloud record for this account…');queue();
   }
  }catch(e){lock('Cloud load stopped: '+e.message+' Local data has not been deleted.');detail.textContent='Do not enter records until this is resolved.';}
  finally{loading=false;}
@@ -329,10 +343,11 @@ archiveButton.className='smallbtn';
 archiveButton.type='button';
 archiveButton.onclick=()=>{
  if(!uid)return alert('Sign in first.');
- const raw=localStorage.getItem(archivedKey(uid));
- if(!raw)return alert('No older device copy has been preserved for this account.');
- const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify({format:'cleanprofit-uk-backup',version:'1.0.2',exportedAt:new Date().toISOString(),data:JSON.parse(raw)},null,2)],{type:'application/json'}));
- a.href=url;a.download='cleanprofit-uk-preserved-device-copy.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+ const keys=[archivedKey(uid),...Array.from({length:30},(_,i)=>extraArchiveKey(uid,i+1))];
+ const copies=keys.filter(k=>localStorage.getItem(k)!==null).map(k=>({key:k,data:JSON.parse(localStorage.getItem(k))}));
+ if(!copies.length)return alert('No older device copy has been preserved for this account.');
+ const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify({format:'cleanprofit-uk-recovery-bundle',version:'1.1',exportedAt:new Date().toISOString(),copies},null,2)],{type:'application/json'}));
+ a.href=url;a.download='cleanprofit-uk-all-preserved-device-copies.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
 };
 document.getElementById('cloudlocalbackup').insertAdjacentElement('afterend',archiveButton);
 document.getElementById('cloudlocalbackup').onclick=()=>{
@@ -350,6 +365,7 @@ document.getElementById('cloudlocalbackup').onclick=()=>{
 let authInitialising=true;
 document.getElementById('cloudsignin').disabled=true;
 client.auth.onAuthStateChange(()=>{if(authInitialising)return;setTimeout(()=>{if(!loading)loadAccount().catch(e=>lock('Connection error: '+e.message))},0)});
+document.querySelectorAll('#tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>{if(uid&&window.cpCloudReady&&b.dataset.tab!=='cloud')try{localStorage.setItem(tabKey(uid),b.dataset.tab)}catch(e){}}));
 window.addEventListener('online',()=>{if(uid&&window.cpCloudReady&&dirty)queue();else if(uid&&!dirty&&!window.cpCloudReady)loadAccount(true).catch(()=>{})});
 window.addEventListener('focus',()=>{if(uid&&window.cpCloudReady&&dirty)queue()});
 // Restore the persisted Supabase session; never sign out merely because the page refreshed.
