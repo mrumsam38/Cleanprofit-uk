@@ -370,7 +370,17 @@ async function loadAccount(force=false){
   }else{
    const existing=localStorage.getItem(key);
    if(existing){const local=JSON.parse(existing);if(!valid(local))throw Error('Local records invalid.');loadState(local);}
-   else loadState(fresh());
+   else {
+    // Do not silently create a blank cloud snapshot for an established account.
+    // This can conceal a cloud access or retrieval problem and risk later data loss.
+    const created=Date.parse(u.created_at||'');
+    if(!Number.isFinite(created)||Date.now()-created>24*60*60*1000){
+     lock('No cloud record was returned for this existing account. Saving is paused to protect your data. Please contact support; do not reset or recreate records.');
+     status.textContent='Signed in: '+u.email+' — cloud record not found; saving paused.';
+     loading=false;return;
+    }
+    loadState(fresh());
+   }
    unlock();showSavedTab();dirty=true;localStorage.setItem(pendingKey(uid),'1');say('Creating cloud record for this account…');queue();
   }
  }catch(e){lock('Cloud load stopped: '+e.message+' Local data has not been deleted.');detail.textContent='Do not enter records until this is resolved.';}
