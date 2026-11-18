@@ -164,6 +164,13 @@ const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const dataKey=id=>'cleanprofit-uk-user-'+id;
 const pendingKey=id=>'cleanprofit-uk-pending-'+id;
 const archivedKey=id=>'cleanprofit-uk-precloud-archive-'+id;
+const tabKey=id=>'cleanprofit-uk-last-tab-'+id;
+function showSavedTab(){
+ const tab=localStorage.getItem(tabKey(uid))||'dashboard';
+ const button=document.querySelector('#tabs [data-tab="'+tab+'"]');
+ if(button&&tab!=='cloud')button.click();
+ else viewDashboard();
+}
 function lock(message){window.cpCloudReady=false;document.body.classList.remove('account-ready');if(message){say(message);detail.textContent=message+' Your data has not been deleted. You can download a local backup below.';}}
 function unlock(){window.cpCloudReady=true;document.body.classList.add('account-ready');}
 function viewDashboard(){document.querySelectorAll('#tabs [data-tab]').forEach(b=>{const sel=b.dataset.tab==='dashboard';b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))});document.querySelectorAll('main section').forEach(e=>e.classList.toggle('hidden',e.id!=='dashboard'));window.scrollTo(0,0)}
@@ -210,12 +217,12 @@ async function loadAccount(force=false){
    }}
    row=r.id;revision=r.updated_at;hasCloud=true;loadState(r.data.snapshot);localStorage.setItem(key,JSON.stringify(state));unlock();
    say(archived?'✓ Cloud records loaded. An older device copy was preserved separately in case you need it.':'✓ Cloud records loaded. All changes saved.');
-   viewDashboard();
+   showSavedTab();
   }else{
    const existing=localStorage.getItem(key);
    if(existing){const local=JSON.parse(existing);if(!valid(local))throw Error('Local records invalid.');loadState(local);}
    else loadState(fresh());
-   unlock();viewDashboard();dirty=true;localStorage.setItem(pendingKey(uid),'1');say('Creating cloud record for this account…');queue();
+   unlock();showSavedTab();dirty=true;localStorage.setItem(pendingKey(uid),'1');say('Creating cloud record for this account…');queue();
   }
  }catch(e){lock('Cloud load stopped: '+e.message+' Local data has not been deleted.');detail.textContent='Do not enter records until this is resolved.';}
  finally{loading=false;}
@@ -264,6 +271,7 @@ document.getElementById('cloudlocalbackup').onclick=()=>{
 let authInitialising=true;
 document.getElementById('cloudsignin').disabled=true;
 client.auth.onAuthStateChange(()=>{if(authInitialising)return;setTimeout(()=>{if(!loading)loadAccount().catch(e=>lock('Connection error: '+e.message))},0)});
+document.querySelectorAll('#tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>{if(uid&&window.cpCloudReady&&b.dataset.tab!=='cloud')try{localStorage.setItem(tabKey(uid),b.dataset.tab)}catch(e){}}));
 window.addEventListener('online',()=>{if(uid&&window.cpCloudReady&&dirty)queue();else if(uid&&!dirty&&!window.cpCloudReady)loadAccount(true).catch(()=>{})});
 window.addEventListener('focus',()=>{if(uid&&window.cpCloudReady&&dirty)queue()});
 // Restore the persisted session on refresh. Only the Sign out button may end it.
