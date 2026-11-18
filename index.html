@@ -340,7 +340,7 @@ document.getElementById('cloudresetconfirm').onclick=()=>run(async()=>{
  await loadAccount(true);
  status.textContent='Password updated. Sign in using your new password.';
 });
-document.getElementById('cloudsignout').onclick=()=>run(async()=>{if(dirty||localStorage.getItem(pendingKey(uid||''))==='1')throw Error('Unsaved changes exist. Download a JSON backup before signing out.');const {error}=await client.auth.signOut();if(error)throw error;await loadAccount(true)});
+document.getElementById('cloudsignout').onclick=()=>run(async()=>{if(dirty||localStorage.getItem(pendingKey(uid||''))==='1')throw Error('Unsaved changes exist. Download a JSON backup before signing out.');const {error}=await client.auth.signOut();if(error)throw error;window.location.reload();});
 document.getElementById('syncretry').onclick=()=>run(retry);
 // Sandbox-only Checkout: reuse the authenticated client already managing this account.
 window.addEventListener('focus',()=>{if(uid&&!loading)loadAccount().catch(()=>lock('Subscription recheck failed.'));});
