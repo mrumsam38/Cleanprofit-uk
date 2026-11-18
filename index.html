@@ -202,8 +202,9 @@ async function checkSubscription(){
  else if(trialOK)subscriptionStatus.textContent='Free trial · '+Math.max(1,Math.ceil((trialEnd-now)/86400000))+' day(s) remaining · ends '+when(trialEnd);
  else if(paidOK)subscriptionStatus.textContent=(data.cancel_at_period_end||data.status==='canceled'?'Cancelled — access until ':'Active subscription · paid access until ')+when(paidEnd);
  else subscriptionStatus.textContent='Access paused · '+(data.status==='trialing'?'Your free trial has ended. Subscribe to continue.':'Subscription status: '+data.status+'. Subscribe or manage billing.');
- document.getElementById('cp-test-checkout').hidden=allowed;
+ document.getElementById('cp-test-checkout').hidden=allowed && !trialOK;
  document.getElementById('cp-test-portal').hidden=!data?.stripe_customer_id;
+ if(trialOK)document.getElementById('cp-test-checkout-status').textContent='Sandbox trial active — test checkout is available. Stripe test subscriptions may bill immediately; never use a real card.';
  return allowed;
 }
 function viewDashboard(){document.querySelectorAll('#tabs [data-tab]').forEach(b=>{const sel=b.dataset.tab==='dashboard';b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))});document.querySelectorAll('main section').forEach(e=>e.classList.toggle('hidden',e.id!=='dashboard'));window.scrollTo(0,0)}
