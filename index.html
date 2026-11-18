@@ -541,22 +541,4 @@ document.querySelectorAll('#dashboard-quick-actions [data-go]').forEach(button=>
  Object.entries(actions).forEach(([id,tab])=>{const el=document.getElementById(id);if(el)el.addEventListener('click',()=>go(tab));});
 })();
 </script>
-<style>
-#cp-toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:2147483647;max-width:min(92vw,480px);width:max-content;box-sizing:border-box;padding:13px 18px;border-radius:12px;background:#153e32;color:#fff;box-shadow:0 8px 28px #0003;font:500 15px/1.45 system-ui,-apple-system,sans-serif;opacity:0;pointer-events:none;transition:opacity .2s ease;text-align:center}
-#cp-toast.cp-visible{opacity:1}
-</style>
-<script>
-/* Use in-app notices instead of blocking browser alerts (which show Safari's Suppress dialogues option). */
-(function(){
- let toastTimer;
- window.alert=function(message){
-   let el=document.getElementById('cp-toast');
-   if(!el){el=document.createElement('div');el.id='cp-toast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el);}
-   el.textContent=String(message??'');
-   el.classList.add('cp-visible');
-   clearTimeout(toastTimer);
-   toastTimer=setTimeout(()=>el.classList.remove('cp-visible'),4000);
- };
-})();
-</script>
 </body></html>
