@@ -8,6 +8,22 @@ input,select,textarea{font-size:16px!important;line-height:1.35}
 @supports (-webkit-touch-callout:none){
  input,select,textarea{-webkit-text-size-adjust:100%}
 }
+/* Customer screen: avoid a wide search + checkbox row and unbreakable record text. */
+#customers .toolbar{min-width:0}
+#customers .toolbar label{display:inline-flex;align-items:center;gap:8px;min-width:0;white-space:normal}
+#customers .toolbar label input[type="checkbox"]{flex:0 0 auto;width:20px;height:20px;margin:0}
+#customerlist,#customerprofile{min-width:0;max-width:100%;overflow-wrap:anywhere}
+#customerlist .recordhead{min-width:0}
+#customerlist .recordhead>*{min-width:0;max-width:100%;overflow-wrap:anywhere}
+#customerlist .record p{overflow-wrap:anywhere;word-break:break-word}
+@media(max-width:650px){
+ #customers .toolbar{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+ #customers .toolbar #customersearch{flex:none;width:100%;min-width:0;max-width:100%}
+ #customers .toolbar label{width:100%;flex:none}
+ #customerlist .recordhead{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+ #customerlist .record .actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ #customerlist .record .actions button{width:100%;min-width:0}
+}
 /* Mobile layout: keep every app screen within the device viewport. */
 html,body{max-width:100%;overflow-x:hidden}
 .shell,main section,.panel,.grid,.two,.grid>*,.two>*{min-width:0}
