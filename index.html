@@ -429,12 +429,12 @@ async function run(fn){
  }finally{controls.forEach((el,i)=>el.disabled=wasDisabled[i]);authRequestPending=false;}
 }
 const email=()=>document.getElementById('cloudemail').value.trim(),password=()=>document.getElementById('cloudpassword').value;
-document.getElementById('cloudsignup').onclick=()=>run(async()=>{if(!email()||!document.getElementById('cloudemail').checkValidity())throw Error('Enter a valid email address.');if(password().length<8)throw Error('Password must have at least 8 characters.');const {data,error}=await client.auth.signUp({email:email(),password:password(),options:{emailRedirectTo:'https://mrumsam38.github.io/Cleanprofit-uk/'}});if(error)throw error;const confirmation=document.getElementById('signup-confirmation');confirmation.hidden=!!data.session;if(!data.session)document.getElementById('signup-confirmation-email').textContent=email();status.textContent=data.session?'Account created. Loading cloud records…':'Account created — check your email and tap the verification link before signing in.';if(data.session)await loadAccount(true)});
+document.getElementById('cloudsignup').onclick=()=>run(async()=>{if(!email()||!document.getElementById('cloudemail').checkValidity())throw Error('Enter a valid email address.');if(password().length<8)throw Error('Password must have at least 8 characters.');const {data,error}=await client.auth.signUp({email:email(),password:password(),options:{emailRedirectTo:window.location.origin+window.location.pathname}});if(error)throw error;const confirmation=document.getElementById('signup-confirmation');confirmation.hidden=!!data.session;if(!data.session)document.getElementById('signup-confirmation-email').textContent=email();status.textContent=data.session?'Account created. Loading cloud records…':'Account created — check your email and tap the verification link before signing in.';if(data.session)await loadAccount(true)});
 document.getElementById('cloudsignin').onclick=()=>run(async()=>{const {error}=await client.auth.signInWithPassword({email:email(),password:password()});if(error)throw error;document.getElementById('cloudpassword').value='';await loadAccount(true)});
 document.getElementById('cloudforgot').onclick=()=>run(async()=>{
  const address=email();
  if(!address||!document.getElementById('cloudemail').checkValidity())throw Error('Enter your email address first.');
- const {error}=await client.auth.resetPasswordForEmail(address,{redirectTo:'https://mrumsam38.github.io/Cleanprofit-uk/?password_reset=1'});
+ const {error}=await client.auth.resetPasswordForEmail(address,{redirectTo:window.location.origin+window.location.pathname+'?password_reset=1'});
  if(error)throw error;
  status.textContent='If an account exists for that email, a password reset link will be sent. Check your inbox and spam folder.';
 });
