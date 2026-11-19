@@ -333,7 +333,7 @@ async function checkSubscription(){
 }
 function viewDashboard(){document.querySelectorAll('#tabs [data-tab]').forEach(b=>{const sel=b.dataset.tab==='dashboard';b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))});document.querySelectorAll('main section').forEach(e=>e.classList.toggle('hidden',e.id!=='dashboard'));window.scrollTo(0,0)}
 function viewCloud(){document.querySelectorAll('#tabs [data-tab]').forEach(b=>{const sel=b.dataset.tab==='cloud';b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))});document.querySelectorAll('main section').forEach(e=>e.classList.toggle('hidden',e.id!=='cloud'))}
-function loadState(x){state={...fresh(),...x,settings:{...defaults.settings,...x.settings}};loadSettings();render()}
+function loadState(x){state={...fresh(),...x,settings:{...defaults.settings,...x.settings,businessType:x.settings?.businessType||'staff'}};loadSettings();render()}
 async function remote(){const {data,error}=await client.from('cp_records').select('id,data,updated_at').eq('record_type','settings').order('updated_at',{ascending:false}).limit(2);if(error)throw error;if(data.length>1)throw Error('Multiple cloud snapshots found. Contact support; no records were changed.');return data[0]||null;}
 async function write(){
  if(!uid||!dirty||busy||!window.cpCloudReady)return;
