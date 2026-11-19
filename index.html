@@ -276,11 +276,11 @@ async function emailInvoice(inv){const missing=invoiceDetailsCheck(inv);if(missi
   const wrap=(txt,x,y,width)=>{const lines=pdf.splitTextToSize(clean(txt),width);pdf.text(lines,x,y);return y+lines.length*6;};
   pdf.setFillColor(8,123,89);pdf.rect(0,0,210,37,'F');pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(20);pdf.text(clean(inv.businessName||'CleanProfit UK'),18,20);pdf.setFontSize(11);pdf.text('INVOICE',192,20,{align:'right'});
   pdf.setTextColor(24,48,41);pdf.setFont('helvetica','bold');pdf.setFontSize(15);pdf.text(clean(inv.number),18,49);
-  pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.text('Issued: '+ukDate(inv.issued),18,58);pdf.text('Due: '+ukDate(inv.due),18,65);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(10);pdf.text('Issued: '+ukDate(inv.issued),18,58);pdf.text('Due: '+ukDate(inv.due),18,65);pdf.text('Service date: '+ukDate(inv.supplyDate),18,72);pdf.setFontSize(8);let supplierY=44;const supplier=[inv.legalName&&inv.legalName!==inv.businessName?inv.legalName:'',inv.businessAddress||'',inv.businessEmail||'',inv.companyNumber?'Company no: '+inv.companyNumber:'',inv.vatNumber?'VAT no: '+inv.vatNumber:''].filter(Boolean);for(const entry of supplier){const lines=pdf.splitTextToSize(clean(entry),74);pdf.text(lines,116,supplierY);supplierY+=lines.length*4;}
   pdf.setFont('helvetica','bold');pdf.text('BILL TO',18,79);pdf.setFont('helvetica','normal');let y=wrap(inv.customerName||'',18,87,90);y=wrap(inv.customerAddress||'',18,y,90);
   pdf.setFont('helvetica','bold');pdf.text('SERVICE',18,115);pdf.setDrawColor(210,222,215);pdf.line(18,119,192,119);
   pdf.setFont('helvetica','normal');let sy=wrap(inv.service||'Cleaning service',18,127,135);pdf.text(clean((inv.hours||0)+' hours x '+(inv.staff||1)+' cleaner(s)'),18,sy+2);
-  line('Subtotal',money(inv.subtotal),155);line('VAT',money(inv.vat),164);pdf.line(18,169,192,169);
+  line('Subtotal',money(inv.subtotal),155);line('VAT '+(inv.vatNumber?'('+String(inv.vatRate??20)+'%)':'(not charged)'),money(inv.vat),164);pdf.line(18,169,192,169);
   line('Invoice total',money(inv.total),178);const paid=(inv.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0);line('Payments received',money(paid),187);
   pdf.setFont('helvetica','bold');line('Balance due',money(invBalance(inv)),198);
   pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.text('Thank you for your business.',18,220);
