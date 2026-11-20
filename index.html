@@ -782,7 +782,7 @@ viewCloud();lock('Restoring secure session…');
 (async()=>{try{await loadAccount(true);}catch(e){lock('Could not restore session: '+e.message);}finally{authInitialising=false;document.getElementById('cloudsignin').disabled=false;}})();
 })();
 </script><script>
-document.querySelectorAll('#dashboard-quick-actions [data-go]').forEach(button=>{
+document.querySelectorAll('#dashboard [data-go]').forEach(button=>{
  button.addEventListener('click',()=>{
   if(!window.cpCloudReady)return;
   const target=document.querySelector('#tabs [data-tab="'+button.dataset.go+'"]');
