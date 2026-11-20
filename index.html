@@ -822,16 +822,35 @@ const title=document.createElement('h3'),message=document.createElement('p'),lis
 details.append(title,message,list);
 const refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.textContent='Refresh statistics';
 panel.append(heading,status,metrics,details,refreshButton);account.append(launch,panel);
-let sequence=0,selected=null,users=null,stats=null;
-const cards=[['Total registrations','total_users','all'],['Verified accounts','verified_users','verified'],['New signups (24 hours)',null,'day'],['New signups (7 days)','signups_last_7_days','week'],['New signups (30 days)','signups_last_30_days','month']];
+let sequence=0,selected=null,users=null,stats=null,subscriptions=null;
+const subscriptionByUser=new Map();
+const cards=[['Total registrations','total_users','all'],['Verified accounts','verified_users','verified'],['New signups (24 hours)',null,'day'],['New signups (7 days)','signups_last_7_days','week'],['New signups (30 days)','signups_last_30_days','month'],['Active free trials',null,'trial'],['Trials expiring in 48 hours',null,'expiring'],['Expired trials',null,'expired'],['Paying subscribers',null,'paid']];
 const days={day:1,week:7,month:30};
+function subscriptionState(user,now){
+ const s=subscriptionByUser.get(user.user_id);
+ if(!s)return 'unknown';
+ const trialEnd=Date.parse(s.trial_ends_at||''),paidEnd=Date.parse(s.current_period_end||'');
+ const trial=s.stripe_mode==='none'&&s.status==='trialing';
+ const paid=s.stripe_mode==='live'&&(s.status==='active'||s.status==='canceled')&&Number.isFinite(paidEnd)&&paidEnd>now;
+ if(paid)return 'paid';
+ if(trial&&Number.isFinite(trialEnd))return trialEnd>now?'trial':'expired';
+ return 'other';
+}
 function matches(user,filter,now){
+ if(['trial','expiring','expired','paid'].includes(filter)){
+  const state=subscriptionState(user,now);
+  if(filter==='expiring'){
+   const end=Date.parse(subscriptionByUser.get(user.user_id)?.trial_ends_at||'');
+   return state==='trial'&&end<=now+2*86400000;
+  }
+  return state===filter;
+ }
  if(filter==='all')return true;
  if(filter==='verified')return !!user.verified_at;
  const time=Date.parse(user.signed_up_at);
  return Number.isFinite(time)&&time>=now-days[filter]*86400000&&time<=now;
 }
-function hide(){sequence++;launch.hidden=true;panel.hidden=true;metrics.replaceChildren();details.hidden=true;list.replaceChildren();selected=null;users=null;stats=null}
+function hide(){sequence++;launch.hidden=true;panel.hidden=true;metrics.replaceChildren();details.hidden=true;list.replaceChildren();selected=null;users=null;stats=null;subscriptions=null;subscriptionByUser.clear()}
 async function verify(){
  const current=++sequence,{data,error}=await client.auth.getUser();
  if(current!==sequence)return;
@@ -850,6 +869,14 @@ function showUsers(){
   const info=document.createElement('div');info.style.cssText='font-size:13px;color:#587467;margin-top:4px';
   const date=Date.parse(u.signed_up_at);
   info.textContent='Registered: '+(Number.isFinite(date)?new Date(date).toLocaleString('en-GB'):'Unknown')+' · '+(u.verified_at?'Email verified':'Email not verified');
+  const sub=subscriptionByUser.get(u.user_id);
+  if(sub){
+   const state=subscriptionState(u,Date.now());
+   const end=state==='paid'?sub.current_period_end:sub.trial_ends_at;
+   const parsed=Date.parse(end||'');
+   info.textContent+=' · '+({trial:'Free trial',expired:'Trial expired',paid:'Paid subscription',other:'Subscription: '+String(sub.status||'unknown')}[state]||'Unknown subscription');
+   if(Number.isFinite(parsed))info.textContent+=' · '+(state==='paid'?'Paid access until: ':'Trial ends: ')+new Date(parsed).toLocaleDateString('en-GB');
+  }else{info.textContent+=' · No subscription record'}
   item.append(email,info);list.append(item);
  }
 }
@@ -859,7 +886,7 @@ function showCards(){
   const button=document.createElement('button');button.type='button';button.className='cp-owner-metric';button.style.cssText='text-align:left;background:#fff;color:#124b38;cursor:pointer;font:inherit;width:100%';
   button.setAttribute('aria-pressed',String(selected===filter));
   if(selected===filter)button.style.background='#effaf3';
-  const value=document.createElement('strong');value.textContent=String(key?stats?.[key]??'—':users.filter(u=>matches(u,'day',Date.now())).length);
+  const value=document.createElement('strong');value.textContent=String(key?stats?.[key]??'—':users.filter(u=>matches(u,filter,Date.now())).length);
   const caption=document.createElement('span');caption.textContent=label;
   button.append(value,caption);button.addEventListener('click',()=>{selected=selected===filter?null:filter;showCards();showUsers()});metrics.append(button);
  }
@@ -869,11 +896,12 @@ async function refresh(){
  const {data:auth,error:authError}=await client.auth.getUser();
  if(current!==sequence)return;
  if(authError||auth?.user?.id!==OWNER){hide();return}
- const [sr,ur]=await Promise.all([client.rpc('cp_owner_stats'),client.rpc('cp_owner_users')]);
+ const [sr,ur,subr]=await Promise.all([client.rpc('cp_owner_stats'),client.rpc('cp_owner_users'),client.rpc('cp_owner_subscriptions')]);
  if(current!==sequence)return;
- if(sr.error||ur.error){status.textContent='Could not load statistics: '+(sr.error||ur.error).message;return}
- stats=sr.data;users=Array.isArray(ur.data)?ur.data:[];
- showCards();showUsers();status.textContent='Tap a statistic to view matching accounts. Active usage is not yet tracked.';
+ if(sr.error||ur.error||subr.error){status.textContent='Could not load statistics: '+(sr.error||ur.error||subr.error).message;return}
+ stats=sr.data;users=Array.isArray(ur.data)?ur.data:[];subscriptions=Array.isArray(subr.data)?subr.data:[];
+ subscriptionByUser.clear();for(const sub of subscriptions)subscriptionByUser.set(sub.user_id,sub);
+ showCards();showUsers();status.textContent='Tap a statistic to view matching accounts. Subscription counts reflect records for the 1,000 most recent registrations; active usage is not yet tracked.';
 }
 launch.addEventListener('click',()=>{panel.hidden=!panel.hidden;if(!panel.hidden)refresh()});
 refreshButton.addEventListener('click',refresh);
