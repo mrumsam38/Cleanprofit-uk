@@ -256,62 +256,6 @@ $('emailquote').onclick=()=>{let d=quoteDetails();if(!d)return;if(!d.c.email)ret
 $('clearjobs').onclick=async ()=>{if(await cpConfirm('Delete all saved jobs from this browser?')){state.jobs=[];persist();render()}};
 $('reset').onclick=async ()=>{if(await cpConfirm('Delete all local data and reset settings?')){state=fresh();persist();loadSettings();render()}};
 $('printquote').onclick=()=>{let d=quoteDetails();if(!d)return;let {q,c,s,ref,date,expiry,service}=d;let content=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quote ${esc(ref)}</title><style>body{font:16px system-ui;max-width:700px;margin:30px auto;padding:20px;color:#17342e}h1{color:#087b59}table{width:100%;border-collapse:collapse}td{padding:12px 0;border-bottom:1px solid #ddd}.total{font-size:24px;font-weight:bold}.muted{color:#5b7169}button{padding:12px;border:0;border-radius:8px;background:#087b59;color:white}@media print{button{display:none}}</style></head><body><button onclick="window.print()">Print / Save PDF</button><h1>${esc(s.businessname||'Your cleaning business')}</h1><p>${esc(s.businessemail)} ${esc(s.businessphone)}</p><h2>Cleaning quotation ${esc(ref)}</h2><p><b>Prepared for:</b> ${esc(c.name)}<br>${esc(c.address)}<br><b>Service:</b> ${esc(service)}<br><b>Issued:</b> ${esc(date)}<br><b>Valid until:</b> ${esc(expiry)}</p><table><tr><td>Estimated duration</td><td>${q.h} hours × ${q.staff} cleaner(s)</td></tr><tr><td>Hourly rate per cleaner</td><td>${money(q.rate)}</td></tr><tr><td>Price excluding VAT</td><td>${money(q.subtotal)}</td></tr><tr><td>VAT</td><td>${money(q.vat)}</td></tr><tr><td class="total">Total quote</td><td class="total">${money(q.price)}</td></tr></table><p class="muted">Estimate only. Confirm scope, inclusions and terms before accepting.</p>
-<style>
-#cp-owner-launch[hidden],#cp-owner-panel[hidden]{display:none!important}
-#cp-owner-launch{margin:10px 0 0;padding:10px 16px;border:1px solid #b9d9c9;border-radius:10px;background:#f0faf5;color:#14543d;font-weight:700;cursor:pointer}
-#cp-owner-panel{margin:20px 0;padding:20px;border:1px solid #c8e4d4;border-radius:16px;background:#fff}
-#cp-owner-panel .cp-owner-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:16px 0}
-#cp-owner-panel .cp-owner-metric{border:1px solid #e0ebe5;border-radius:12px;padding:14px}
-#cp-owner-panel .cp-owner-metric strong{display:block;font-size:26px;color:#124b38}
-#cp-owner-panel .cp-owner-metric span{font-size:12px;color:#587467}
-</style>
-<script>
-(function(){
-'use strict';
-const OWNER='5da5f1e7-5381-43fd-b8ac-9a68520394c8';
-const account=document.getElementById('cloud');
-if(!account||!window.cpAdminClient)return;
-const launch=document.createElement('button');
-launch.id='cp-owner-launch';launch.type='button';launch.hidden=true;launch.textContent='Owner dashboard';
-const panel=document.createElement('div');panel.id='cp-owner-panel';panel.hidden=true;
-panel.innerHTML='<h2>CleanProfit owner dashboard</h2><p id="cp-owner-status" role="status">Loading owner statistics…</p><div class="cp-owner-metrics" id="cp-owner-metrics"></div><button type="button" id="cp-owner-refresh">Refresh statistics</button>';
-account.append(launch,panel);
-const client=window.cpAdminClient;
-let request=0;
-const hide=()=>{launch.hidden=true;panel.hidden=true;document.getElementById('cp-owner-metrics').replaceChildren()};
-async function verify(){
- const id=++request;
- const {data:{user},error}=await client.auth.getUser();
- if(id!==request)return;
- if(error||user?.id!==OWNER){hide();return}
- launch.hidden=false;
-}
-async function refresh(){
- const id=++request;
- const status=document.getElementById('cp-owner-status');
- status.textContent='Loading owner statistics…';
- const {data:{user},error:authError}=await client.auth.getUser();
- if(id!==request)return;
- if(authError||user?.id!==OWNER){hide();return}
- const {data,error}=await client.rpc('cp_owner_stats');
- if(id!==request)return;
- if(error){status.textContent='Unable to load statistics: '+error.message;return}
- const fields=[['Total registrations','total_users'],['Verified accounts','verified_users'],['New signups (7 days)','signups_last_7_days'],['New signups (30 days)','signups_last_30_days']];
- const host=document.getElementById('cp-owner-metrics');host.replaceChildren();
- for(const [label,key] of fields){
-  const box=document.createElement('div');box.className='cp-owner-metric';
-  const value=document.createElement('strong');value.textContent=String(data?.[key]??'—');
-  const name=document.createElement('span');name.textContent=label;
-  box.append(value,name);host.append(box);
- }
- status.textContent='Registration statistics from Supabase. These figures do not measure active usage.';
-}
-launch.addEventListener('click',()=>{panel.hidden=!panel.hidden;if(!panel.hidden)refresh()});
-document.getElementById('cp-owner-refresh').addEventListener('click',refresh);
-client.auth.onAuthStateChange(()=>{hide();setTimeout(()=>verify().catch(hide),0)});
-document.querySelector('#tabs [data-tab="cloud"]')?.addEventListener('click',()=>verify().catch(hide));
-verify().catch(hide);
-})();
 </script>
 </body></html>`;content=content.replace(/£/g,'&#163;').replace(/×/g,'&#215;');let blob=new Blob([content],{type:'text/html;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)};
 
@@ -852,6 +796,63 @@ document.querySelectorAll('#dashboard [data-go]').forEach(button=>{
  const go=tab=>{if(!window.cpCloudReady)return;const button=document.querySelector('#tabs [data-tab="'+tab+'"]');if(button)button.click();};
  const actions={'quote-add-customer':'customers','quote-view-saved':'invoices','invoices-new-quote':'quote','invoices-customers':'customers'};
  Object.entries(actions).forEach(([id,tab])=>{const el=document.getElementById(id);if(el)el.addEventListener('click',()=>go(tab));});
+})();
+</script>
+<style>
+#cp-owner-launch[hidden],#cp-owner-panel[hidden]{display:none!important}
+#cp-owner-launch{margin:10px 0 0;padding:10px 16px;border:1px solid #b9d9c9;border-radius:10px;background:#f0faf5;color:#14543d;font-weight:700;cursor:pointer}
+#cp-owner-panel{margin:20px 0;padding:20px;border:1px solid #c8e4d4;border-radius:16px;background:#fff}
+#cp-owner-panel .cp-owner-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:16px 0}
+#cp-owner-panel .cp-owner-metric{border:1px solid #e0ebe5;border-radius:12px;padding:14px}
+#cp-owner-panel .cp-owner-metric strong{display:block;font-size:26px;color:#124b38}
+#cp-owner-panel .cp-owner-metric span{font-size:12px;color:#587467}
+</style>
+<script>
+(function(){
+'use strict';
+const OWNER='5da5f1e7-5381-43fd-b8ac-9a68520394c8';
+const account=document.getElementById('cloud');
+if(!account||!window.cpAdminClient)return;
+const launch=document.createElement('button');
+launch.id='cp-owner-launch';launch.type='button';launch.hidden=true;launch.textContent='Owner dashboard';
+const panel=document.createElement('div');panel.id='cp-owner-panel';panel.hidden=true;
+panel.innerHTML='<h2>CleanProfit owner dashboard</h2><p id="cp-owner-status" role="status">Loading owner statistics…</p><div class="cp-owner-metrics" id="cp-owner-metrics"></div><button type="button" id="cp-owner-refresh">Refresh statistics</button>';
+account.append(launch,panel);
+const client=window.cpAdminClient;
+let request=0;
+const hide=()=>{launch.hidden=true;panel.hidden=true;document.getElementById('cp-owner-metrics').replaceChildren()};
+async function verify(){
+ const id=++request;
+ const {data:{user},error}=await client.auth.getUser();
+ if(id!==request)return;
+ if(error||user?.id!==OWNER){hide();return}
+ launch.hidden=false;
+}
+async function refresh(){
+ const id=++request;
+ const status=document.getElementById('cp-owner-status');
+ status.textContent='Loading owner statistics…';
+ const {data:{user},error:authError}=await client.auth.getUser();
+ if(id!==request)return;
+ if(authError||user?.id!==OWNER){hide();return}
+ const {data,error}=await client.rpc('cp_owner_stats');
+ if(id!==request)return;
+ if(error){status.textContent='Unable to load statistics: '+error.message;return}
+ const fields=[['Total registrations','total_users'],['Verified accounts','verified_users'],['New signups (7 days)','signups_last_7_days'],['New signups (30 days)','signups_last_30_days']];
+ const host=document.getElementById('cp-owner-metrics');host.replaceChildren();
+ for(const [label,key] of fields){
+  const box=document.createElement('div');box.className='cp-owner-metric';
+  const value=document.createElement('strong');value.textContent=String(data?.[key]??'—');
+  const name=document.createElement('span');name.textContent=label;
+  box.append(value,name);host.append(box);
+ }
+ status.textContent='Registration statistics from Supabase. These figures do not measure active usage.';
+}
+launch.addEventListener('click',()=>{panel.hidden=!panel.hidden;if(!panel.hidden)refresh()});
+document.getElementById('cp-owner-refresh').addEventListener('click',refresh);
+client.auth.onAuthStateChange(()=>{hide();setTimeout(()=>verify().catch(hide),0)});
+document.querySelector('#tabs [data-tab="cloud"]')?.addEventListener('click',()=>verify().catch(hide));
+verify().catch(hide);
 })();
 </script>
 </body></html>
