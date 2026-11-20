@@ -537,6 +537,12 @@ function preserveLocalCopy(id,raw){
  return true;
 }
 function showSavedTab(){
+ if(new URLSearchParams(window.location.search).get('owner_return')==='account'){
+  viewCloud();
+  document.querySelector('#tabs [data-tab="cloud"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
+  window.history.replaceState(null,'',window.location.pathname);
+  return;
+ }
  const tab=localStorage.getItem(tabKey(uid))||'dashboard';
  const button=document.querySelector('#tabs [data-tab="'+tab+'"]');
  if(button&&tab!=='cloud'&&tab!=='account'&&tab!=='settings')button.click();
