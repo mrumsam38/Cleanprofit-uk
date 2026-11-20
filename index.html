@@ -517,6 +517,7 @@ function showAccountAuth(user){
 const say=t=>sync.textContent=t;
 let client;
 try{if(!window.supabase)throw Error('Cloud library could not load. Check internet access.');client=window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){status.textContent=e.message;return;}
+window.cpOwnerClient=client;
 let uid=null,row=null,revision=null,busy=false,dirty=false,loading=false,timer=null,accountEpoch=0,hasCloud=false;
 window.cpCloudReady=false;
 const valid=x=>x&&x.settings&&Array.isArray(x.customers)&&Array.isArray(x.jobs)&&Array.isArray(x.bookings)&&Array.isArray(x.quotes)&&Array.isArray(x.invoices);
@@ -796,4 +797,64 @@ document.querySelectorAll('#dashboard [data-go]').forEach(button=>{
  Object.entries(actions).forEach(([id,tab])=>{const el=document.getElementById(id);if(el)el.addEventListener('click',()=>go(tab));});
 })();
 </script>
+<style>
+#cp-owner-launch[hidden],#cp-owner-panel[hidden]{display:none!important}
+#cp-owner-launch{margin:14px 0;padding:12px 16px;border:1px solid #b9d9c9;border-radius:10px;background:#f0faf5;color:#14543d;font-weight:700}
+#cp-owner-panel{margin:12px 0 24px;padding:18px;border:1px solid #c8e4d4;border-radius:14px;background:#fff}
+#cp-owner-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin:14px 0}
+.cp-owner-metric{padding:14px;border:1px solid #e0ebe5;border-radius:12px}
+.cp-owner-metric strong{display:block;font-size:25px;color:#124b38}
+.cp-owner-metric span{font-size:12px;color:#587467}
+</style>
+<script>
+(function(){
+'use strict';
+const OWNER='5da5f1e7-5381-43fd-b8ac-9a68520394c8';
+const client=window.cpOwnerClient;
+const account=document.getElementById('cloud');
+if(!client||!account)return;
+const launch=document.createElement('button');
+launch.id='cp-owner-launch';launch.type='button';launch.hidden=true;launch.textContent='Owner dashboard';
+const panel=document.createElement('div');
+panel.id='cp-owner-panel';panel.hidden=true;
+const heading=document.createElement('h2');heading.textContent='CleanProfit owner dashboard';
+const status=document.createElement('p');status.id='cp-owner-status';status.setAttribute('role','status');
+const metrics=document.createElement('div');metrics.id='cp-owner-metrics';
+const refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.textContent='Refresh statistics';
+panel.append(heading,status,metrics,refreshButton);account.append(launch,panel);
+let sequence=0;
+function hide(){sequence++;launch.hidden=true;panel.hidden=true;metrics.replaceChildren()}
+async function verify(){
+ const current=++sequence;
+ const {data,error}=await client.auth.getUser();
+ if(current!==sequence)return;
+ if(error||data?.user?.id!==OWNER){hide();return}
+ launch.hidden=false;
+}
+async function refresh(){
+ const current=++sequence;
+ status.textContent='Loading owner statistics…';
+ const {data:auth,error:authError}=await client.auth.getUser();
+ if(current!==sequence)return;
+ if(authError||auth?.user?.id!==OWNER){hide();return}
+ const {data,error}=await client.rpc('cp_owner_stats');
+ if(current!==sequence)return;
+ if(error){status.textContent='Could not load statistics: '+error.message;return}
+ metrics.replaceChildren();
+ for(const [label,key] of [['Total registrations','total_users'],['Verified accounts','verified_users'],['New signups (7 days)','signups_last_7_days'],['New signups (30 days)','signups_last_30_days']]){
+  const item=document.createElement('div');item.className='cp-owner-metric';
+  const value=document.createElement('strong');value.textContent=String(data?.[key]??'—');
+  const caption=document.createElement('span');caption.textContent=label;
+  item.append(value,caption);metrics.append(item);
+ }
+ status.textContent='Registration statistics from Supabase; active usage is not yet tracked.';
+}
+launch.addEventListener('click',()=>{panel.hidden=!panel.hidden;if(!panel.hidden)refresh()});
+refreshButton.addEventListener('click',refresh);
+client.auth.onAuthStateChange(()=>{hide();setTimeout(()=>verify().catch(hide),0)});
+document.querySelector('#tabs [data-tab="cloud"]')?.addEventListener('click',()=>verify().catch(hide));
+verify().catch(hide);
+})();
+</script>
+
 </body></html>
