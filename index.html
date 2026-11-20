@@ -540,7 +540,7 @@ function showSavedTab(){
  if(new URLSearchParams(window.location.search).get('owner_return')==='account'){
   viewCloud();
   document.querySelector('#tabs [data-tab="cloud"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
-  window.history.replaceState(null,'',window.location.pathname);
+  // Keep the return intent for any subsequent cloud reload during this visit.
   return;
  }
  const tab=localStorage.getItem(tabKey(uid))||'dashboard';
