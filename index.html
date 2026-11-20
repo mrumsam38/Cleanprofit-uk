@@ -810,44 +810,70 @@ document.querySelectorAll('#dashboard [data-go]').forEach(button=>{
 (function(){
 'use strict';
 const OWNER='5da5f1e7-5381-43fd-b8ac-9a68520394c8';
-const client=window.cpOwnerClient;
-const account=document.getElementById('cloud');
+const client=window.cpOwnerClient,account=document.getElementById('cloud');
 if(!client||!account)return;
-const launch=document.createElement('button');
-launch.id='cp-owner-launch';launch.type='button';launch.hidden=true;launch.textContent='Owner dashboard';
-const panel=document.createElement('div');
-panel.id='cp-owner-panel';panel.hidden=true;
+const launch=document.createElement('button');launch.id='cp-owner-launch';launch.type='button';launch.hidden=true;launch.textContent='Owner dashboard';
+const panel=document.createElement('div');panel.id='cp-owner-panel';panel.hidden=true;
 const heading=document.createElement('h2');heading.textContent='CleanProfit owner dashboard';
 const status=document.createElement('p');status.id='cp-owner-status';status.setAttribute('role','status');
 const metrics=document.createElement('div');metrics.id='cp-owner-metrics';
+const details=document.createElement('div');details.id='cp-owner-details';details.hidden=true;
+const title=document.createElement('h3'),message=document.createElement('p'),list=document.createElement('div');
+details.append(title,message,list);
 const refreshButton=document.createElement('button');refreshButton.type='button';refreshButton.textContent='Refresh statistics';
-panel.append(heading,status,metrics,refreshButton);account.append(launch,panel);
-let sequence=0;
-function hide(){sequence++;launch.hidden=true;panel.hidden=true;metrics.replaceChildren()}
+panel.append(heading,status,metrics,details,refreshButton);account.append(launch,panel);
+let sequence=0,selected=null,users=null,stats=null;
+const cards=[['Total registrations','total_users','all'],['Verified accounts','verified_users','verified'],['New signups (24 hours)',null,'day'],['New signups (7 days)','signups_last_7_days','week'],['New signups (30 days)','signups_last_30_days','month']];
+const days={day:1,week:7,month:30};
+function matches(user,filter,now){
+ if(filter==='all')return true;
+ if(filter==='verified')return !!user.verified_at;
+ const time=Date.parse(user.signed_up_at);
+ return Number.isFinite(time)&&time>=now-days[filter]*86400000&&time<=now;
+}
+function hide(){sequence++;launch.hidden=true;panel.hidden=true;metrics.replaceChildren();details.hidden=true;list.replaceChildren();selected=null;users=null;stats=null}
 async function verify(){
- const current=++sequence;
- const {data,error}=await client.auth.getUser();
+ const current=++sequence,{data,error}=await client.auth.getUser();
  if(current!==sequence)return;
  if(error||data?.user?.id!==OWNER){hide();return}
  launch.hidden=false;
 }
+function showUsers(){
+ if(!selected||!users){details.hidden=true;return}
+ details.hidden=false;list.replaceChildren();
+ const filtered=users.filter(u=>matches(u,selected,Date.now()));
+ title.textContent=cards.find(c=>c[2]===selected)[0];
+ message.textContent=filtered.length+' matching account(s) shown (up to 1,000 most recent registrations).';
+ for(const u of filtered){
+  const item=document.createElement('div');item.style.cssText='padding:12px 0;border-bottom:1px solid #e0ebe5;overflow-wrap:anywhere';
+  const email=document.createElement('strong');email.textContent=u.email||'No email';
+  const info=document.createElement('div');info.style.cssText='font-size:13px;color:#587467;margin-top:4px';
+  const date=Date.parse(u.signed_up_at);
+  info.textContent='Registered: '+(Number.isFinite(date)?new Date(date).toLocaleString('en-GB'):'Unknown')+' · '+(u.verified_at?'Email verified':'Email not verified');
+  item.append(email,info);list.append(item);
+ }
+}
+function showCards(){
+ metrics.replaceChildren();
+ for(const [label,key,filter] of cards){
+  const button=document.createElement('button');button.type='button';button.className='cp-owner-metric';button.style.cssText='text-align:left;background:#fff;color:#124b38;cursor:pointer;font:inherit;width:100%';
+  button.setAttribute('aria-pressed',String(selected===filter));
+  if(selected===filter)button.style.background='#effaf3';
+  const value=document.createElement('strong');value.textContent=String(key?stats?.[key]??'—':users.filter(u=>matches(u,'day',Date.now())).length);
+  const caption=document.createElement('span');caption.textContent=label;
+  button.append(value,caption);button.addEventListener('click',()=>{selected=selected===filter?null:filter;showCards();showUsers()});metrics.append(button);
+ }
+}
 async function refresh(){
- const current=++sequence;
- status.textContent='Loading owner statistics…';
+ const current=++sequence;status.textContent='Loading owner statistics…';
  const {data:auth,error:authError}=await client.auth.getUser();
  if(current!==sequence)return;
  if(authError||auth?.user?.id!==OWNER){hide();return}
- const {data,error}=await client.rpc('cp_owner_stats');
+ const [sr,ur]=await Promise.all([client.rpc('cp_owner_stats'),client.rpc('cp_owner_users')]);
  if(current!==sequence)return;
- if(error){status.textContent='Could not load statistics: '+error.message;return}
- metrics.replaceChildren();
- for(const [label,key] of [['Total registrations','total_users'],['Verified accounts','verified_users'],['New signups (7 days)','signups_last_7_days'],['New signups (30 days)','signups_last_30_days']]){
-  const item=document.createElement('div');item.className='cp-owner-metric';
-  const value=document.createElement('strong');value.textContent=String(data?.[key]??'—');
-  const caption=document.createElement('span');caption.textContent=label;
-  item.append(value,caption);metrics.append(item);
- }
- status.textContent='Registration statistics from Supabase; active usage is not yet tracked.';
+ if(sr.error||ur.error){status.textContent='Could not load statistics: '+(sr.error||ur.error).message;return}
+ stats=sr.data;users=Array.isArray(ur.data)?ur.data:[];
+ showCards();showUsers();status.textContent='Tap a statistic to view matching accounts. Active usage is not yet tracked.';
 }
 launch.addEventListener('click',()=>{panel.hidden=!panel.hidden;if(!panel.hidden)refresh()});
 refreshButton.addEventListener('click',refresh);
