@@ -888,7 +888,7 @@ function showCards(){
   if(selected===filter)button.style.background='#effaf3';
   const value=document.createElement('strong');value.textContent=String(key?stats?.[key]??'—':users.filter(u=>matches(u,filter,Date.now())).length);
   const caption=document.createElement('span');caption.textContent=label;
-  button.append(value,caption);button.addEventListener('click',()=>{selected=selected===filter?null:filter;showCards();showUsers()});metrics.append(button);
+  button.append(value,caption);button.addEventListener('click',()=>{window.location.assign('owner-accounts.html?filter='+encodeURIComponent(filter))});metrics.append(button);
  }
 }
 async function refresh(){
