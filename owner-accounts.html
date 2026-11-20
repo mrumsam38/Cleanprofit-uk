@@ -1,0 +1,53 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Owner account details | CleanProfit UK</title><style>
+:root{font-family:system-ui,-apple-system,sans-serif;color:#193a2d;background:#f5f8f6}body{margin:0}main{max-width:850px;margin:auto;padding:24px 16px 70px}a{color:#176747}header{display:flex;justify-content:space-between;gap:12px;align-items:center}h1{font-size:clamp(24px,5vw,34px);margin:24px 0 8px}.muted{color:#567165}.panel{background:white;border:1px solid #d9e7df;border-radius:16px;padding:20px;margin-top:20px}.user{padding:15px 0;border-bottom:1px solid #e4eee8;overflow-wrap:anywhere}.user strong{display:block}.user small{display:block;margin-top:6px;color:#567165;line-height:1.6}.pill{display:inline-block;padding:5px 9px;border-radius:12px;background:#e7f6ec;font-size:12px}button{padding:10px 14px;border-radius:9px;border:1px solid #b6d4c2;background:white;color:#17583c;cursor:pointer}#notice{min-height:24px}
+</style></head><body><main><header><strong>CleanProfit UK · Owner dashboard</strong><a href="./index.html#cloud">Back to dashboard</a></header><h1 id="heading">Account details</h1><p class="muted" id="notice" role="status">Checking owner access…</p><div class="panel"><div id="accounts"></div></div></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script><script>
+(async function(){
+'use strict';
+const OWNER='5da5f1e7-5381-43fd-b8ac-9a68520394c8',URL="https://ymmkcrgezytzvvwecutx.supabase.co",KEY="sb_publishable_21nCBV-seQmnZ6N-eTJ2DA_EJi5duAy";
+const titles={all:'Total registrations',verified:'Verified accounts',day:'New signups (24 hours)',week:'New signups (7 days)',month:'New signups (30 days)',trial:'Active free trials',expiring:'Trials expiring in 48 hours',expired:'Expired trials',paid:'Paying subscribers'};
+const filter=new URLSearchParams(location.search).get('filter');
+const heading=document.getElementById('heading'),notice=document.getElementById('notice'),host=document.getElementById('accounts');
+if(!Object.prototype.hasOwnProperty.call(titles,filter)){notice.textContent='Unknown account category.';return}
+heading.textContent=titles[filter];
+if(!window.supabase){notice.textContent='Could not load secure connection. Please retry.';return}
+const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+try{
+ const {data:auth,error:authError}=await client.auth.getUser();
+ if(authError||auth?.user?.id!==OWNER){notice.textContent='Owner access required. Please sign in to your owner account on CleanProfit first.';return}
+ const [ur,sr]=await Promise.all([client.rpc('cp_owner_users'),client.rpc('cp_owner_subscriptions')]);
+ if(ur.error||sr.error)throw ur.error||sr.error;
+ const users=Array.isArray(ur.data)?ur.data:[],subs=new Map((Array.isArray(sr.data)?sr.data:[]).map(s=>[s.user_id,s]));
+ const now=Date.now(),days={day:1,week:7,month:30};
+ function state(user){
+  const s=subs.get(user.user_id);if(!s)return 'unknown';
+  const te=Date.parse(s.trial_ends_at||''),pe=Date.parse(s.current_period_end||'');
+  if(s.stripe_mode==='live'&&(s.status==='active'||s.status==='canceled')&&Number.isFinite(pe)&&pe>now)return 'paid';
+  if(s.stripe_mode==='none'&&s.status==='trialing'&&Number.isFinite(te))return te>now?'trial':'expired';
+  return 'other';
+ }
+ function match(user){
+  if(filter==='all')return true;
+  if(filter==='verified')return !!user.verified_at;
+  if(Object.prototype.hasOwnProperty.call(days,filter)){const d=Date.parse(user.signed_up_at);return Number.isFinite(d)&&d>=now-days[filter]*86400000&&d<=now}
+  if(filter==='expiring'){const end=Date.parse(subs.get(user.user_id)?.trial_ends_at||'');return state(user)==='trial'&&end<=now+2*86400000}
+  return state(user)===filter;
+ }
+ const matched=users.filter(match);
+ notice.textContent=matched.length+' matching account(s) from the latest 1,000 registrations.';
+ if(!matched.length){host.textContent='No matching accounts found.';return}
+ for(const user of matched){
+  const item=document.createElement('div');item.className='user';
+  const email=document.createElement('strong');email.textContent=user.email||'No email address';
+  const meta=document.createElement('small');const registered=Date.parse(user.signed_up_at);
+  meta.textContent='Registered: '+(Number.isFinite(registered)?new Date(registered).toLocaleString('en-GB'):'Unknown')+' · '+(user.verified_at?'Email verified':'Email not verified');
+  const sub=subs.get(user.user_id),st=state(user);
+  if(sub){
+   const desc={paid:'Paid subscription',trial:'Free trial',expired:'Trial expired',other:'Subscription: '+String(sub.status||'unknown')}[st]||'Unknown subscription';
+   const end=Date.parse((st==='paid'?sub.current_period_end:sub.trial_ends_at)||'');
+   meta.textContent+=' · '+desc+(Number.isFinite(end)?' · '+(st==='paid'?'Paid access until: ':'Trial ends: ')+new Date(end).toLocaleDateString('en-GB'):'');
+  }else meta.textContent+=' · No subscription record';
+  item.append(email,meta);host.append(item);
+ }
+}catch(error){notice.textContent='Could not load account details: '+(error?.message||'Unknown error')}
+})();
+</script></body></html>
