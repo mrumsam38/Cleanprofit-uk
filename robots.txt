@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /owner-accounts.html
+
+Sitemap: https://cleanprofit.co.uk/sitemap.xml
