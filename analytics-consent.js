@@ -37,6 +37,14 @@ window.cpAnalyticsEvent=function(name){
  if(choice!=='accepted'||!loaded)return;
  if(name==='sign_up')window.gtag('event','sign_up',{method:'email'});
 };
+// Track only public landing-page CTA clicks, never customer records.
+document.addEventListener('click',function(event){
+ const link=event.target.closest&&event.target.closest('a');
+ if(!link||!location.pathname.endsWith('/cleaning-business-software.html'))return;
+ if(link.getAttribute('href')==='/'){
+  if(choice==='accepted'&&loaded)window.gtag('event','trial_cta_click',{source:'landing_page'});
+ }
+});
 window.cpOpenCookieSettings=show;
 function init(){
  document.head.appendChild(style);
