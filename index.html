@@ -516,7 +516,7 @@ function showAccountAuth(user){
 
 const say=t=>sync.textContent=t;
 let client;
-try{if(!window.supabase)throw Error('Cloud library could not load. Check internet access.');client=window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){status.textContent=e.message;return;}
+try{if(!window.supabase)throw Error('Cloud library could not load. Check internet access.');client=window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY,{auth:{persistSession:true,storage:window.sessionStorage,autoRefreshToken:true,detectSessionInUrl:true}})}catch(e){status.textContent=e.message;return;}
 window.cpOwnerClient=client;
 let uid=null,row=null,revision=null,busy=false,dirty=false,loading=false,timer=null,accountEpoch=0,hasCloud=false;
 window.cpCloudReady=false;
