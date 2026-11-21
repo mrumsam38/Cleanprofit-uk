@@ -537,15 +537,18 @@ function preserveLocalCopy(id,raw){
  return true;
 }
 function showSavedTab(){
- if(new URLSearchParams(window.location.search).get('owner_return')==='account'){
+ const returning=new URLSearchParams(window.location.search).get('owner_return')==='account';
+ if(returning){
+  try{localStorage.setItem(tabKey(uid),'cloud')}catch(e){}
   viewCloud();
-  document.querySelector('#tabs [data-tab="cloud"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
-  // Keep the return intent for any subsequent cloud reload during this visit.
+  // The one-time return link must not override future refreshes or tab choices.
+  const url=new URL(window.location.href);url.searchParams.delete('owner_return');
+  window.history.replaceState(null,'',url.pathname+url.search+url.hash);
   return;
  }
  const tab=localStorage.getItem(tabKey(uid))||'dashboard';
  const button=document.querySelector('#tabs [data-tab="'+tab+'"]');
- if(button&&tab!=='cloud'&&tab!=='account'&&tab!=='settings')button.click();
+ if(button)button.click();
  else viewDashboard();
 }
 function lock(message){window.cpCloudReady=false;document.body.classList.remove('account-ready');if(message){say(message);detail.textContent=message+' Your data has not been deleted. You can download a local backup below.';}}
@@ -780,7 +783,7 @@ document.getElementById('cloudlocalbackup').onclick=()=>{
 let authInitialising=true;
 document.getElementById('cloudsignin').disabled=true;
 client.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY'){recoveryMode=true;showAccountAuth(null);}if(authInitialising)return;setTimeout(()=>{if(!loading)loadAccount().catch(e=>lock('Connection error: '+e.message))},0)});
-document.querySelectorAll('#tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>{if(uid&&window.cpCloudReady&&b.dataset.tab!=='cloud')try{localStorage.setItem(tabKey(uid),b.dataset.tab)}catch(e){}}));
+document.querySelectorAll('#tabs [data-tab]').forEach(b=>b.addEventListener('click',()=>{if(uid&&window.cpCloudReady)try{localStorage.setItem(tabKey(uid),b.dataset.tab)}catch(e){}}));
 window.addEventListener('online',()=>{if(uid&&window.cpCloudReady&&dirty)queue();else if(uid&&!dirty&&!window.cpCloudReady)loadAccount(true).catch(()=>{})});
 window.addEventListener('focus',()=>{if(uid&&window.cpCloudReady&&dirty)queue()});
 // Restore the persisted Supabase session; never sign out merely because the page refreshed.
